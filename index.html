@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pitch Visualizer — Words to Storyboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&family=Space+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0d0b0e;
+      --paper: #f5f0e8;
+      --cream: #ede8dc;
+      --gold: #c9a84c;
+      --gold-light: #e8c96d;
+      --rust: #b5451b;
+      --teal: #1d6b6b;
+      --panel-bg: #1a1714;
+      --text-muted: #8a7e6e;
+      --border: rgba(201,168,76,0.25);
+      --glow: rgba(201,168,76,0.15);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--ink);
+      color: var(--paper);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    /* ──── HEADER ──── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 2rem 3rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1.5rem;
+      position: relative;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 3rem;
+      width: 80px;
+      height: 2px;
+      background: var(--gold);
+    }
+
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.4rem;
+      letter-spacing: 0.06em;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 50%, var(--gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-sub {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .api-status {
+      margin-left: auto;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .api-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 2px;
+      letter-spacing: 0.1em;
+    }
+    .api-badge.active { background: rgba(29,107,107,0.3); color: #5cd0d0; border: 1px solid rgba(92,208,208,0.3); }
+    .api-badge.inactive { background: rgba(181,69,27,0.2); color: #e07a5f; border: 1px solid rgba(181,69,27,0.3); }
+
+    /* ──── MAIN LAYOUT ──── */
+    main {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      min-height: calc(100vh - 85px);
+    }
+
+    /* ──── LEFT PANEL ──── */
+    .input-panel {
+      border-right: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+    }
+
+    .panel-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.75rem;
+    }
+
+    .narrative-wrap {
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      height: 220px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--paper);
+      font-family: 'DM Serif Display', serif;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      padding: 1.25rem;
+      resize: vertical;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    textarea:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px var(--glow), inset 0 0 20px rgba(201,168,76,0.03);
+    }
+    textarea::placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .char-count {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 0.75rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+    }
+
+    /* Style selector */
+    .style-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .style-option {
+      cursor: pointer;
+    }
+    .style-option input { display: none; }
+    .style-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.75rem 0.5rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      background: rgba(255,255,255,0.02);
+    }
+    .style-option label:hover { border-color: var(--border); }
+    .style-option input:checked + label {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.08);
+      box-shadow: 0 0 12px var(--glow);
+    }
+    .style-icon { font-size: 1.4rem; }
+    .style-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .style-option input:checked + label .style-name { color: var(--gold-light); }
+
+    /* Generate button */
+    .generate-btn {
+      width: 100%;
+      padding: 1.1rem;
+      background: linear-gradient(135deg, var(--gold) 0%, #a8863c 100%);
+      color: var(--ink);
+      border: none;
+      border-radius: 4px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.2rem;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .generate-btn:hover {
+      box-shadow: 0 4px 24px rgba(201,168,76,0.35);
+      transform: translateY(-1px);
+    }
+    .generate-btn:active { transform: translateY(0); }
+    .generate-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .generate-btn .btn-shine {
+      position: absolute;
+      top: 0; left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      transform: skewX(-20deg);
+      animation: shine 2.5s ease-in-out infinite;
+    }
+    @keyframes shine {
+      0% { left: -100%; }
+      60%, 100% { left: 150%; }
+    }
+
+    /* Example prompts */
+    .examples {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+    }
+    .example-item {
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      transition: color 0.15s;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .example-item:hover { color: var(--paper); }
+    .example-item::before {
+      content: '→ ';
+      color: var(--gold);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+    }
+
+    /* ──── RIGHT PANEL ──── */
+    .output-panel {
+      padding: 2.5rem 2.5rem;
+      overflow-y: auto;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem 1.25rem;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .status-bar.visible { display: flex; }
+
+    .status-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(201,168,76,0.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--gold-light);
+      letter-spacing: 0.05em;
+    }
+
+    /* Progress dots */
+    .progress-dots {
+      display: none;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .progress-dots.visible { display: flex; }
+    .progress-dot {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      transition: all 0.3s;
+    }
+    .progress-dot.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      box-shadow: 0 0 8px var(--glow);
+    }
+    .progress-dot.done {
+      background: var(--gold);
+      border-color: var(--gold);
+      color: var(--ink);
+    }
+
+    /* ──── STORYBOARD ──── */
+    #storyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .panel-card {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: panelIn 0.5s ease forwards;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--panel-bg);
+    }
+    @keyframes panelIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+    .panel-num {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.1rem;
+      color: var(--gold);
+      letter-spacing: 0.1em;
+    }
+    .panel-style-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      padding: 0.15rem 0.5rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 2px;
+      letter-spacing: 0.1em;
+    }
+
+    .panel-image-wrap {
+      position: relative;
+      background: #0a0a0a;
+    }
+    .panel-image-wrap img {
+      width: 100%;
+      display: block;
+      max-height: 400px;
+      object-fit: cover;
+    }
+
+    .panel-image-loading {
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+    }
+
+    .panel-body {
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    .panel-section-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .panel-section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .panel-segment-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      color: rgba(245,240,232,0.9);
+      font-style: italic;
+    }
+
+    .panel-prompt-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      line-height: 1.7;
+      color: var(--text-muted);
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      text-align: center;
+      gap: 1.5rem;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      font-size: 3rem;
+      opacity: 0.4;
+    }
+
+    .empty-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.5rem;
+      color: rgba(245,240,232,0.4);
+    }
+
+    .empty-desc {
+      font-size: 0.82rem;
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    /* Film strip decoration */
+    .filmstrip {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .filmstrip-hole {
+      width: 12px;
+      height: 8px;
+      border-radius: 1px;
+      background: var(--border);
+    }
+
+    /* Complete banner */
+    .complete-banner {
+      display: none;
+      padding: 1rem 1.5rem;
+      background: rgba(29,107,107,0.15);
+      border: 1px solid rgba(92,208,208,0.2);
+      border-radius: 4px;
+      margin-bottom: 2rem;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.72rem;
+      color: #5cd0d0;
+      letter-spacing: 0.05em;
+    }
+    .complete-banner.visible { display: block; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      .input-panel { border-right: none; border-bottom: 1px solid var(--border); }
+      .panel-body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Pitch Visualizer</div>
+    <div class="logo-sub">Narrative → Storyboard Engine</div>
+  </div>
+</header>
+
+<main>
+  <!-- LEFT: Input -->
+  <aside class="input-panel">
+    <div class="narrative-wrap">
+      <div class="panel-label">01 — Your Narrative</div>
+      <textarea id="narrativeInput" placeholder="Paste your sales narrative, customer success story, or pitch here. 3–5 sentences work best for a compelling storyboard…" oninput="updateCharCount()"></textarea>
+      <span class="char-count" id="charCount">0 chars</span>
+    </div>
+
+    <div>
+      <div class="panel-label">02 — Visual Style</div>
+      <div class="style-grid">
+        {% for key, style in styles.items() %}
+        <div class="style-option">
+          <input type="radio" name="style" id="style_{{ key }}" value="{{ key }}" {% if key == 'digital_art' %}checked{% endif %}>
+          <label for="style_{{ key }}">
+            <span class="style-icon">{{ style.icon }}</span>
+            <span class="style-name">{{ style.label }}</span>
+          </label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-label">03 — Generate</div>
+      <button class="generate-btn" id="generateBtn" onclick="startGeneration()">
+        <span class="btn-shine"></span>
+        Generate Storyboard
+      </button>
+    </div>
+
+    <div class="examples">
+      <div class="panel-label">Try an example</div>
+      <div class="example-item" onclick="loadExample(0)">SaaS customer success story</div>
+      <div class="example-item" onclick="loadExample(1)">Healthcare transformation pitch</div>
+      <div class="example-item" onclick="loadExample(2)">Climate tech investor narrative</div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Output -->
+  <section class="output-panel">
+    <div class="status-bar" id="statusBar">
+      <div class="status-spinner"></div>
+      <span class="status-text" id="statusText">Initializing…</span>
+    </div>
+
+    <div class="progress-dots" id="progressDots"></div>
+    <div class="complete-banner" id="completeBanner"></div>
+
+    <div id="storyboard">
+      <div class="empty-state" id="emptyState">
+        <div class="filmstrip">
+          {% for _ in range(8) %}<div class="filmstrip-hole"></div>{% endfor %}
+        </div>
+        <div class="empty-icon">🎬</div>
+        <div class="empty-title">Your storyboard awaits</div>
+        <div class="empty-desc">Paste a narrative on the left, choose a visual style, and watch your words transform into a visual storyboard — panel by panel.</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const EXAMPLES = [
+  `Acme Corp was drowning in manual data entry, costing them 40 hours a week in lost productivity. When they implemented our AI-powered platform, everything changed overnight. Within the first month, their team reclaimed those hours and refocused on high-value customer relationships. Six months later, Acme saw a 3x increase in pipeline velocity and closed their biggest deal ever. Today, they call our software the single best investment they've made in a decade.`,
+  
+  `St. Mary's Hospital faced a crisis: patients were waiting 4 hours in the ER before seeing a doctor. Our intelligent triage system learned from millions of cases to predict patient acuity before they even walked through the door. Nurses were guided in real-time, prioritizing the sickest patients with uncanny accuracy. Within 90 days, average wait times dropped to 47 minutes and patient satisfaction scores hit an all-time high. What once felt impossible had quietly become the new standard of care.`,
+  
+  `The Amazon rainforest loses an area the size of a football field every single minute. Our satellite monitoring platform can detect illegal deforestation within hours, not months, giving conservation teams the intelligence they need to act. We partnered with three governments and 12 indigenous communities to deploy 200 monitoring nodes across 50 million acres. In our first year, we helped prevent over 800,000 acres of destruction. Together, we are writing a different story for the planet.`
+];
+
+function loadExample(index) {
+  document.getElementById('narrativeInput').value = EXAMPLES[index];
+  updateCharCount();
+}
+
+function updateCharCount() {
+  const len = document.getElementById('narrativeInput').value.length;
+  document.getElementById('charCount').textContent = `${len} chars`;
+}
+
+async function checkApiStatus() {
+  try {
+    const res = await fetch('/health');
+    const data = await res.json();
+    const setBadge = (id, key, label) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const on = data.apis[key];
+      el.className = `api-badge ${on ? 'active' : 'inactive'}`;
+      el.textContent = `${label} ${on ? '✓' : '—'}`;
+    };
+    setBadge('ollamaBadge', 'ollama', 'Ollama');
+    setBadge('hfBadge', 'huggingface_llm', 'HF LLM');
+    setBadge('stabilityBadge', 'stability_ai', 'Stability AI');
+    setBadge('dallebadge', 'openai_dalle', 'DALL·E 3');
+  } catch (e) {}
+}
+
+let panelCount = 0;
+
+function startGeneration() {
+  const narrative = document.getElementById('narrativeInput').value.trim();
+  if (!narrative) {
+    alert('Please enter a narrative first.');
+    return;
+  }
+
+  const style = document.querySelector('input[name="style"]:checked').value;
+
+  // Reset UI
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('storyboard').innerHTML = '';
+  document.getElementById('completeBanner').classList.remove('visible');
+  document.getElementById('statusBar').classList.add('visible');
+  document.getElementById('progressDots').innerHTML = '';
+  document.getElementById('progressDots').classList.remove('visible');
+  document.getElementById('generateBtn').disabled = true;
+  panelCount = 0;
+
+  const body = JSON.stringify({ narrative, style });
+
+  fetch('/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body
+  }).then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    // Base64 image payloads are huge; one SSE event can span multiple stream chunks.
+    // Buffer until we have full lines, otherwise JSON.parse fails and images never show.
+    let sseBuffer = '';
+
+    function read() {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          if (sseBuffer.trim()) {
+            sseBuffer.split('\n').forEach((l) => {
+              if (l.trim()) processSseLine(l);
+            });
+          }
+          return;
+        }
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split('\n');
+        sseBuffer = lines.pop() || '';
+        lines.forEach(processSseLine);
+        read();
+      });
+    }
+
+    function processSseLine(raw) {
+      const line = raw.replace(/\r$/, '');
+      if (!line.startsWith('data: ')) return;
+      try {
+        const event = JSON.parse(line.slice(6));
+        handleEvent(event);
+      } catch (e) {
+        console.warn('SSE JSON parse error (incomplete line?):', e.message);
+      }
+    }
+
+    read();
+  }).catch(err => {
+    document.getElementById('statusText').textContent = 'Connection error: ' + err.message;
+    document.getElementById('generateBtn').disabled = false;
+  });
+}
+
+function handleEvent(event) {
+  switch(event.type) {
+    case 'status':
+      document.getElementById('statusText').textContent = event.message;
+      break;
+
+    case 'segments':
+      panelCount = event.count;
+      const dots = document.getElementById('progressDots');
+      dots.innerHTML = '';
+      for (let i = 0; i < event.count; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'progress-dot';
+        dot.id = `dot-${i}`;
+        dot.textContent = i + 1;
+        dots.appendChild(dot);
+      }
+      dots.classList.add('visible');
+      break;
+
+    case 'prompt_ready':
+      const dot = document.getElementById(`dot-${event.index}`);
+      if (dot) dot.classList.add('active');
+      // Create panel skeleton
+      createPanelSkeleton(event.index, event.prompt);
+      break;
+
+    case 'panel_ready':
+      updatePanel(event.panel);
+      const doneDot = document.getElementById(`dot-${event.panel.index}`);
+      if (doneDot) { doneDot.classList.remove('active'); doneDot.classList.add('done'); doneDot.textContent = '✓'; }
+      break;
+
+    case 'complete':
+      document.getElementById('statusBar').classList.remove('visible');
+      document.getElementById('generateBtn').disabled = false;
+      const banner = document.getElementById('completeBanner');
+      banner.textContent = `✓ Storyboard complete — ${event.total} panels generated`;
+      banner.classList.add('visible');
+      break;
+
+    case 'error':
+      document.getElementById('statusText').textContent = '✗ Error: ' + event.message;
+      document.getElementById('generateBtn').disabled = false;
+      break;
+  }
+}
+
+function createPanelSkeleton(index, prompt) {
+  const board = document.getElementById('storyboard');
+  const card = document.createElement('div');
+  card.className = 'panel-card';
+  card.id = `panel-${index}`;
+  card.style.animationDelay = `${index * 0.1}s`;
+  card.innerHTML = `
+    <div class="panel-header">
+      <span class="panel-num">SCENE ${index + 1}</span>
+      <span class="panel-style-badge">generating…</span>
+    </div>
+    <div class="panel-image-wrap">
+      <div class="panel-image-loading">
+        <div class="status-spinner"></div>
+        <span>Rendering visual…</span>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div>
+        <div class="panel-section-label">Original Segment</div>
+        <div class="panel-segment-text" id="seg-${index}">Loading…</div>
+      </div>
+      <div>
+        <div class="panel-section-label">Engineered Prompt</div>
+        <div class="panel-prompt-text">${escapeHtml(prompt)}</div>
+      </div>
+    </div>`;
+  board.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updatePanel(panel) {
+  const card = document.getElementById(`panel-${panel.index}`);
+  if (!card) return;
+
+  // Update header badge (style + prompt source: ollama / huggingface / heuristic)
+  const src = panel.prompt_source || '';
+  const srcLabel = src === 'heuristic' ? 'rule-based' : src;
+  card.querySelector('.panel-style-badge').textContent = srcLabel
+    ? `${panel.style} · ${srcLabel}`
+    : panel.style;
+
+  // Update image (avoid innerHTML with huge data URLs; set src on a node)
+  const imgWrap = card.querySelector('.panel-image-wrap');
+  imgWrap.innerHTML = '';
+  const img = document.createElement('img');
+  img.alt = `Scene ${panel.index + 1}`;
+  img.loading = 'lazy';
+  img.style.width = '100%';
+  img.style.display = 'block';
+  img.style.maxHeight = '400px';
+  img.style.objectFit = 'cover';
+  img.onerror = () => {
+    imgWrap.innerHTML = '<div class="panel-image-loading"><span>Image failed to load. Try a smaller payload or check the browser console.</span></div>';
+  };
+  img.src = panel.image || '';
+  imgWrap.appendChild(img);
+
+  // Update segment text
+  const segEl = document.getElementById(`seg-${panel.index}`);
+  if (segEl) segEl.textContent = panel.segment;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Init
+checkApiStatus();
+</script>
+</body>
+</html>
